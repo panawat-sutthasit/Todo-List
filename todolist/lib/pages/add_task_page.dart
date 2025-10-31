@@ -24,6 +24,20 @@ class _AddTaskPageState extends State<AddTaskPage> {
     super.dispose();
   }
 
+  // สีตามระดับความสำคัญ
+  Color _priorityColor(TaskPriority p) {
+    switch (p) {
+      case TaskPriority.high:
+        return const Color(0xFFEF4444); // แดง
+      case TaskPriority.medium:
+        return const Color(0xFFFACC15); // เหลือง
+      case TaskPriority.low:
+      // ignore: unreachable_switch_default
+      default:
+        return const Color(0xFF50E3C2); // มิ้นต์
+    }
+  }
+
   Future<void> _pickDate() async {
     final now = DateTime.now();
     final picked = await showDatePicker(
@@ -42,7 +56,15 @@ class _AddTaskPageState extends State<AddTaskPage> {
 
   Future<void> _save() async {
     final text = _title.text.trim();
-    if (text.isEmpty) return;
+
+    // ตรวจว่าขั้นต่ำ 3 ตัวอักษร
+    if (text.length < 3) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('กรุณากรอกชื่องานอย่างน้อย 3 ตัวอักษร')),
+      );
+      return;
+    }
+
     final newTask = Task(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       title: text,
@@ -83,6 +105,10 @@ class _AddTaskPageState extends State<AddTaskPage> {
     final theme = Theme.of(context);
     final provider = context.watch<TaskProvider>();
 
+    // ข้อความวันที่
+    final dueText =
+        _due == null ? '' : DateFormat('dd/MM/yyyy').format(_due!);
+
     return Scaffold(
       backgroundColor: theme.colorScheme.surfaceContainerLowest,
       body: SafeArea(
@@ -94,96 +120,144 @@ class _AddTaskPageState extends State<AddTaskPage> {
               Card(
                 elevation: 3,
                 shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(24)),
+                  borderRadius: BorderRadius.circular(24),
+                ),
                 child: Padding(
                   padding: const EdgeInsets.all(20),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
+                      // Title + helper + counter 0/40
                       TextField(
                         controller: _title,
-                        maxLength: 40,
+                        maxLength: 40, // แสดง counter อัตโนมัติขวาล่าง
                         decoration: InputDecoration(
                           hintText: 'What needs to be done?',
-                          counterText: '',
+                          helperText: 'อย่างน้อย 3 ตัวอักษร', // ซ้ายล่าง
                           filled: true,
-                          fillColor:
-                              // ignore: deprecated_member_use
-                              theme.colorScheme.surface.withOpacity(0.05),
+                          // ignore: deprecated_member_use
+                          fillColor: theme.colorScheme.surface.withOpacity(0.05),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(16),
                           ),
                           contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 14),
+                            horizontal: 16,
+                            vertical: 14,
+                          ),
                         ),
                         textInputAction: TextInputAction.next,
                         onSubmitted: (_) => _save(),
                       ),
                       const SizedBox(height: 12),
+
+                      // Due date + Priority
                       Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // วันที่
+                          // Due Date field + helper "เลือกวันที่"
                           Expanded(
-                            child: GestureDetector(
-                              onTap: _pickDate,
-                              child: AbsorbPointer(
-                                child: TextField(
-                                  readOnly: true,
-                                  controller: TextEditingController(
-                                    text: _due == null
-                                        ? ''
-                                        : DateFormat('dd/MM/yyyy')
-                                            .format(_due!),
-                                  ),
-                                  decoration: InputDecoration(
-                                    hintText: 'Due Date',
-                                    suffixIcon: IconButton(
-                                      onPressed: _pickDate,
-                                      icon: const Icon(
-                                          Icons.calendar_today_outlined),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                GestureDetector(
+                                  onTap: _pickDate,
+                                  child: AbsorbPointer(
+                                    child: TextField(
+                                      readOnly: true,
+                                      controller: TextEditingController(text: dueText),
+                                      decoration: InputDecoration(
+                                        hintText: 'Due Date',
+                                        suffixIcon: IconButton(
+                                          onPressed: _pickDate,
+                                          icon: const Icon(Icons.calendar_today_outlined),
+                                        ),
+                                        border: OutlineInputBorder(
+                                          borderRadius: BorderRadius.circular(16),
+                                        ),
+                                        contentPadding: const EdgeInsets.symmetric(
+                                          horizontal: 16,
+                                          vertical: 14,
+                                        ),
+                                      ),
                                     ),
+                                  ),
+                                ),
+                                const SizedBox(height: 6),
+                                const Text(
+                                  'เลือกวันที่',
+                                  style: TextStyle(fontSize: 12, color: Colors.black54),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+
+                          // Priority field + helper "ระดับความสำคัญของงาน"
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                DropdownButtonFormField<TaskPriority>(
+                                  // ignore: deprecated_member_use
+                                  value: _priority,
+                                  items: TaskPriority.values.map((p) {
+                                    final label = p.name[0].toUpperCase() + p.name.substring(1);
+                                    return DropdownMenuItem(
+                                      value: p,
+                                      child: Row(
+                                        children: [
+                                          Container(
+                                            width: 10,
+                                            height: 10,
+                                            decoration: BoxDecoration(
+                                              color: _priorityColor(p),
+                                              shape: BoxShape.circle,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Text(label),
+                                        ],
+                                      ),
+                                    );
+                                  }).toList(),
+                                  // ให้ค่าที่ถูกเลือกแสดงสีตามระดับ
+                                  selectedItemBuilder: (ctx) =>
+                                      TaskPriority.values.map((p) {
+                                    final label = p.name[0].toUpperCase() + p.name.substring(1);
+                                    return Align(
+                                      alignment: Alignment.centerLeft,
+                                      child: Text(
+                                        label,
+                                        style: TextStyle(color: _priorityColor(p)),
+                                      ),
+                                    );
+                                  }).toList(),
+                                  onChanged: (v) => setState(() => _priority = v ?? TaskPriority.low),
+                                  decoration: InputDecoration(
+                                    hintText: 'Priority',
                                     border: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(16),
                                     ),
                                     contentPadding: const EdgeInsets.symmetric(
-                                        horizontal: 16, vertical: 14),
+                                      horizontal: 16,
+                                      vertical: 14,
+                                    ),
                                   ),
                                 ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          // Priority
-                          Expanded(
-                            child: DropdownButtonFormField<TaskPriority>(
-                              // ignore: deprecated_member_use
-                              value: _priority,
-                              items: const [
-                                DropdownMenuItem(
-                                    value: TaskPriority.low,
-                                    child: Text('Low')),
-                                DropdownMenuItem(
-                                    value: TaskPriority.medium,
-                                    child: Text('Medium')),
-                                DropdownMenuItem(
-                                    value: TaskPriority.high,
-                                    child: Text('High')),
-                              ],
-                              onChanged: (v) =>
-                                  setState(() => _priority = v!),
-                              decoration: InputDecoration(
-                                hintText: 'Priority',
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(16),
+                                const SizedBox(height: 6),
+                                const Text(
+                                  'ระดับความสำคัญของงาน',
+                                  style: TextStyle(fontSize: 12, color: Colors.black54),
                                 ),
-                                contentPadding: const EdgeInsets.symmetric(
-                                    horizontal: 16, vertical: 14),
-                              ),
+                              ],
                             ),
                           ),
                         ],
                       ),
+
                       const SizedBox(height: 16),
+
+                      // Add button
                       SizedBox(
                         height: 52,
                         child: FilledButton.icon(
@@ -199,7 +273,7 @@ class _AddTaskPageState extends State<AddTaskPage> {
                           ),
                           onPressed: _save,
                           icon: const Icon(Icons.add_task_rounded),
-                          label: const Text("Add Task"),
+                          label: const Text('Add Task'),
                         ),
                       ),
                     ],
@@ -213,10 +287,10 @@ class _AddTaskPageState extends State<AddTaskPage> {
               Card(
                 elevation: 2,
                 shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(20)),
+                  borderRadius: BorderRadius.circular(20),
+                ),
                 child: Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -241,7 +315,9 @@ class _AddTaskPageState extends State<AddTaskPage> {
                             borderRadius: BorderRadius.circular(16),
                           ),
                           contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 14),
+                            horizontal: 16,
+                            vertical: 14,
+                          ),
                         ),
                       ),
                     ],
@@ -257,10 +333,12 @@ class _AddTaskPageState extends State<AddTaskPage> {
                   padding: const EdgeInsets.only(top: 40),
                   child: Column(
                     children: [
-                      Icon(Icons.edit_note,
-                          size: 64,
-                          // ignore: deprecated_member_use
-                          color: theme.colorScheme.primary.withOpacity(.35)),
+                      Icon(
+                        Icons.edit_note,
+                        size: 64,
+                        // ignore: deprecated_member_use
+                        color: theme.colorScheme.primary.withOpacity(.35),
+                      ),
                       const SizedBox(height: 8),
                       Text('No tasks yet', style: theme.textTheme.titleMedium),
                       const SizedBox(height: 4),
@@ -269,130 +347,91 @@ class _AddTaskPageState extends State<AddTaskPage> {
                   ),
                 )
               else
-                ...provider.tasks.map((t) => TaskCard(
-                      task: t,
-                      onEdit: () async {
-                        final ctrl = TextEditingController(text: t.title);
-                        DateTime? dd = t.due;
-                        TaskPriority pp = t.priority;
-                        await showDialog(
-                          context: context,
-                          builder: (_) => AlertDialog(
-                            title: const Text('Edit Task'),
-                            content: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                TextField(
-                                  controller: ctrl,
-                                  decoration: const InputDecoration(
-                                      labelText: 'Title'),
-                                ),
-                                const SizedBox(height: 8),
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: OutlinedButton.icon(
-                                        onPressed: () async {
-                                          final now = DateTime.now();
-                                          final picked = await showDatePicker(
-                                            context: context,
-                                            firstDate:
-                                                DateTime(now.year - 1),
-                                            lastDate:
-                                                DateTime(now.year + 5),
-                                            initialDate: dd ?? now,
-                                          );
-                                          if (picked != null) dd = picked;
-                                        },
-                                        icon: const Icon(
-                                            Icons.calendar_today, size: 18),
-                                        label: Text(dd == null
+                ...provider.tasks.map(
+                  (t) => TaskCard(
+                    task: t,
+                    onEdit: () async {
+                      final ctrl = TextEditingController(text: t.title);
+                      DateTime? dd = t.due;
+                      TaskPriority pp = t.priority;
+                      await showDialog(
+                        context: context,
+                        builder: (_) => AlertDialog(
+                          title: const Text('Edit Task'),
+                          content: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              TextField(
+                                controller: ctrl,
+                                decoration: const InputDecoration(labelText: 'Title'),
+                              ),
+                              const SizedBox(height: 8),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: OutlinedButton.icon(
+                                      onPressed: () async {
+                                        final now = DateTime.now();
+                                        final picked = await showDatePicker(
+                                          context: context,
+                                          firstDate: DateTime(now.year - 1),
+                                          lastDate: DateTime(now.year + 5),
+                                          initialDate: dd ?? now,
+                                        );
+                                        if (picked != null) dd = picked;
+                                      },
+                                      icon: const Icon(Icons.calendar_today, size: 18),
+                                      label: Text(
+                                        dd == null
                                             ? 'ว/ด/ปปปป'
-                                            : DateFormat('dd/MM/yyyy')
-                                                .format(dd!)),
+                                            : DateFormat('dd/MM/yyyy').format(dd!),
                                       ),
                                     ),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      child:
-                                          DropdownButtonFormField<TaskPriority>(
-                                        // ignore: deprecated_member_use
-                                        value: pp,
-                                        items: const [
-                                          DropdownMenuItem(
-                                              value: TaskPriority.low,
-                                              child: Text('Low')),
-                                          DropdownMenuItem(
-                                              value: TaskPriority.medium,
-                                              child: Text('Medium')),
-                                          DropdownMenuItem(
-                                              value: TaskPriority.high,
-                                              child: Text('High')),
-                                        ],
-                                        onChanged: (v) =>
-                                            pp = v ?? TaskPriority.low,
-                                        decoration: const InputDecoration(
-                                            labelText: 'Priority'),
-                                      ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: DropdownButtonFormField<TaskPriority>(
+                                      // ignore: deprecated_member_use
+                                      value: pp,
+                                      items: const [
+                                        DropdownMenuItem(
+                                            value: TaskPriority.low, child: Text('Low')),
+                                        DropdownMenuItem(
+                                            value: TaskPriority.medium, child: Text('Medium')),
+                                        DropdownMenuItem(
+                                            value: TaskPriority.high, child: Text('High')),
+                                      ],
+                                      onChanged: (v) => pp = v ?? TaskPriority.low,
+                                      decoration: const InputDecoration(labelText: 'Priority'),
                                     ),
-                                  ],
-                                ),
-                              ],
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(context),
+                              child: const Text('Cancel'),
                             ),
-                            actions: [
-                              TextButton(
-                                onPressed: () => Navigator.pop(context),
-                                child: const Text('Cancel'),
-                              ),
-                              FilledButton(
-                                onPressed: () async {
-                                  t.title = ctrl.text.trim().isEmpty
-                                      ? t.title
-                                      : ctrl.text.trim();
-                                  t.due = dd;
-                                  t.priority = pp;
-                                  await context
-                                      .read<TaskProvider>()
-                                      .update(t);
-                                  if (context.mounted)
-                                    // ignore: curly_braces_in_flow_control_structures
-                                    Navigator.pop(context);
-                                },
-                                child: const Text('Save'),
-                              ),
-                            ],
-                          ),
-                        );
-                      },
-                      onDelete: () async {
-                        final confirm = await showDialog<bool>(
-                          context: context,
-                          builder: (_) => AlertDialog(
-                            title: const Text('Confirm Delete'),
-                            content: const Text(
-                                'คุณแน่ใจหรือไม่ว่าต้องการลบงานนี้ออก?'),
-                            actions: [
-                              TextButton(
-                                onPressed: () =>
-                                    Navigator.pop(context, false),
-                                child: const Text('Cancel'),
-                              ),
-                              FilledButton(
-                                onPressed: () =>
-                                    Navigator.pop(context, true),
-                                style: FilledButton.styleFrom(
-                                    backgroundColor: Colors.red),
-                                child: const Text('Delete'),
-                              ),
-                            ],
-                          ),
-                        );
-                        if (confirm == true) {
-                          // ignore: use_build_context_synchronously
-                          await context.read<TaskProvider>().delete(t.id);
-                        }
-                      },
-                    )),
+                            FilledButton(
+                              onPressed: () async {
+                                final newTitle = ctrl.text.trim();
+                                if (newTitle.isNotEmpty) t.title = newTitle;
+                                t.due = dd;
+                                t.priority = pp;
+                                await context.read<TaskProvider>().update(t);
+                                if (context.mounted) Navigator.pop(context);
+                              },
+                              child: const Text('Save'),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                    // ❌ ไม่ส่ง onDelete เพื่อไม่ให้มี dialog ซ้ำ
+                  ),
+                ),
               const SizedBox(height: 100),
             ],
           ),

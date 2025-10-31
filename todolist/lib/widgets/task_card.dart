@@ -1,3 +1,5 @@
+// ignore_for_file: deprecated_member_use
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -8,7 +10,7 @@ import '../providers/task_provider.dart';
 class TaskCard extends StatelessWidget {
   final Task task;
   final Future<void> Function() onEdit;
-  /// ถ้าไม่ส่ง onDelete มา จะลบผ่าน provider.removeById(task.id) ให้เอง
+  /// ถ้าไม่ส่ง onDelete มา จะลบผ่าน provider.delete(task.id) ให้เอง
   final Future<void> Function()? onDelete;
 
   const TaskCard({
@@ -18,7 +20,7 @@ class TaskCard extends StatelessWidget {
     this.onDelete,
   });
 
-  // พาเล็ตสีตามโปรเจกต์
+  // โทนสีตามโปรเจกต์
   static const _primary = Color(0xFF4A90E2);
   static const _mint = Color(0xFF50E3C2);
   static const _accentYellow = Color(0xFFFACC15);
@@ -41,17 +43,17 @@ class TaskCard extends StatelessWidget {
     final bool ok = await showDialog<bool>(
           context: context,
           builder: (_) => AlertDialog(
-            title: const Text('ยืนยันการลบ'),
-            content: Text('ต้องการลบ “${task.title}” จริงๆ ใช่ไหม?'),
+            title: const Text('Confirm Delete'),
+            content: const Text('คุณแน่ใจหรือไม่ว่าต้องการลบงานนี้ออก?'),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context, false),
-                child: const Text('ยกเลิก'),
+                child: const Text('Cancel'),
               ),
               FilledButton(
                 style: FilledButton.styleFrom(backgroundColor: _errorRed),
                 onPressed: () => Navigator.pop(context, true),
-                child: const Text('ลบ'),
+                child: const Text('Delete'),
               ),
             ],
           ),
@@ -63,18 +65,9 @@ class TaskCard extends StatelessWidget {
     if (onDelete != null) {
       await onDelete!();
     } else {
-      // fallback: ลบผ่าน provider ถ้าไม่ได้ส่ง callback มา
+      // fallback: ลบผ่าน provider
       // ignore: use_build_context_synchronously
-      final prov = context.read<TaskProvider>();
-      // ignore: unnecessary_null_comparison
-      if (prov.removeById != null) {
-        await prov.removeById(task.id);
-      // ignore: dead_code
-      } else {
-        // เผื่อบางโปรเจกต์มีเมธอดชื่ออื่น
-        // ให้ลองลบแบบกรอง list แล้ว notify แทน (ปรับใช้ตามโปรเจกต์จริง)
-        await prov.removeById(task.id);
-      }
+      await context.read<TaskProvider>().delete(task.id);
     }
   }
 
@@ -92,8 +85,7 @@ class TaskCard extends StatelessWidget {
           value: task.isDone,
           activeColor: _primary,
           onChanged: (v) async {
-            task.isDone = v ?? false;
-            await provider.update(task);
+            await provider.toggleDone(task.id, v ?? false);
           },
         ),
         title: Text(
@@ -114,7 +106,6 @@ class TaskCard extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: BoxDecoration(
-                // ignore: deprecated_member_use
                 color: _priorityColor(task.priority).withOpacity(0.15),
                 borderRadius: BorderRadius.circular(12),
               ),
@@ -133,12 +124,12 @@ class TaskCard extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             IconButton(
-              tooltip: 'แก้ไข',
+              tooltip: 'Edit',
               icon: const Icon(Icons.edit, color: _accentYellow),
               onPressed: onEdit,
             ),
             IconButton(
-              tooltip: 'ลบ',
+              tooltip: 'Delete',
               icon: const Icon(Icons.delete, color: _errorRed),
               onPressed: () => _confirmDelete(context),
             ),
