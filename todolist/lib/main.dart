@@ -5,7 +5,7 @@ import 'pages/add_task_page.dart';
 import 'pages/dashboard_page.dart';
 import 'providers/task_provider.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   runApp(const ToDoApp());
 }
@@ -15,11 +15,12 @@ class ToDoApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const primary = Color(0xFF4A90E2);     // Primary (ฟ้า)
-    const secondary = Color(0xFF50E3C2);   // Secondary (มิ้นต์)
-    const error = Color(0xFFEF4444);       // Error (แดง)
-    const bg = Color(0xFFF9FAFB);          // Background
-    const text = Color(0xFF1E293B);        // Text
+    // สีหลักตามดีไซน์
+    const primary = Color(0xFF4A90E2);   // Primary (ฟ้า)
+    const secondary = Color(0xFF50E3C2); // Secondary (มิ้นต์)
+    const error = Color(0xFFEF4444);     // Error (แดง)
+    const bg = Color(0xFFF9FAFB);        // Background
+    const text = Color(0xFF1E293B);      // Text
 
     return ChangeNotifierProvider(
       create: (_) => TaskProvider()..load(),
@@ -37,11 +38,28 @@ class ToDoApp extends StatelessWidget {
             brightness: Brightness.light,
           ),
           textTheme: const TextTheme(
-            bodyMedium: TextStyle(color: text),
+            bodyMedium: TextStyle(color: text, fontSize: 14),
           ),
           inputDecorationTheme: InputDecorationTheme(
-            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+          ),
+          filledButtonTheme: FilledButtonThemeData(
+            style: FilledButton.styleFrom(
+              backgroundColor: primary,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+            ),
+          ),
+          chipTheme: ChipThemeData(
+            shape: StadiumBorder(
+              side: BorderSide(color: const Color(0xFFE2E8F0)),
+            ),
           ),
         ),
         home: const AppShell(),
@@ -50,7 +68,7 @@ class ToDoApp extends StatelessWidget {
   }
 }
 
-/// เปลือกแอพ + Bottom Navigation (Add Task ซ้าย / Dashboard ขวา)
+/// โครงหลัก + Bottom Navigation (ซ้าย: Add Task / ขวา: Dashboard)
 class AppShell extends StatefulWidget {
   const AppShell({super.key});
 
@@ -59,15 +77,19 @@ class AppShell extends StatefulWidget {
 }
 
 class _AppShellState extends State<AppShell> {
-  // เปิดที่ Dashboard ก่อน ตามโปรโตไทป์
-  int _index = 1;
+  /// เปิดหน้า ADD TASK ก่อนเสมอ
+  int _index = 0;
 
   @override
   Widget build(BuildContext context) {
-    final pages = const [AddTaskPage(), DashboardPage()];
+    // ใช้ IndexedStack เพื่อคงสภาพหน้าเวลาสลับแท็บ
+    final pages = const <Widget>[
+      AddTaskPage(),
+      DashboardPage(),
+    ];
 
     return Scaffold(
-      body: pages[_index],
+      body: IndexedStack(index: _index, children: pages),
       bottomNavigationBar: _BottomNav(
         index: _index,
         onTap: (i) => setState(() => _index = i),
@@ -76,7 +98,7 @@ class _AppShellState extends State<AppShell> {
   }
 }
 
-/// แถบนำทางด้านล่าง (ติดล่าง, สี primary, กดได้ทั้งสองปุ่ม)
+/// แถบนำทางล่างแบบคัสตอม (ตรงตามดีไซน์)
 class _BottomNav extends StatelessWidget {
   final int index;
   final ValueChanged<int> onTap;
@@ -84,17 +106,36 @@ class _BottomNav extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 72,
-      decoration: const BoxDecoration(
-        color: Color(0xFF4A90E2),
-        boxShadow: [BoxShadow(blurRadius: 10, offset: Offset(0, -2), color: Color(0x22000000))],
-      ),
-      child: Row(
-        children: [
-          _item(icon: Icons.add, label: 'ADD TASK', active: index == 0, onTap: () => onTap(0)),
-          _item(icon: Icons.grid_view_rounded, label: 'DASHBOARD', active: index == 1, onTap: () => onTap(1)),
-        ],
+    return SafeArea(
+      top: false,
+      child: Container(
+        height: 72,
+        decoration: const BoxDecoration(
+          color: Color(0xFF4A90E2),
+          boxShadow: [
+            BoxShadow(
+              blurRadius: 10,
+              offset: Offset(0, -2),
+              color: Color(0x22000000),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            _item(
+              icon: Icons.add,
+              label: 'ADD TASK',
+              active: index == 0,
+              onTap: () => onTap(0),
+            ),
+            _item(
+              icon: Icons.grid_view_rounded,
+              label: 'DASHBOARD',
+              active: index == 1,
+              onTap: () => onTap(1),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -109,13 +150,19 @@ class _BottomNav extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         child: Opacity(
-          opacity: active ? 1 : 0.75,
+          opacity: active ? 1 : 0.8,
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Icon(icon, color: Colors.white),
               const SizedBox(height: 4),
-              Text(label, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+              Text(
+                label,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ],
           ),
         ),
