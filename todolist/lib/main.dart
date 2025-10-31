@@ -26,7 +26,7 @@ class ToDoApp extends StatelessWidget {
       create: (_) => TaskProvider()..load(),
       child: MaterialApp(
         debugShowCheckedModeBanner: false,
-        title: 'To-Do',
+        title: 'To-Do-List App',
         theme: ThemeData(
           useMaterial3: true,
           scaffoldBackgroundColor: bg,
