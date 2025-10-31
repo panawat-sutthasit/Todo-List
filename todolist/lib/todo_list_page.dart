@@ -1,5 +1,8 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:todolist/models/todo_item.dart';
 
 class TodoListPage extends StatefulWidget {
@@ -19,7 +22,43 @@ class _TodoListPageState extends State<TodoListPage> {
   DateTime? _dueDate;
   Priority _priority = Priority.meduim;
 
+  int? _editingIndex;
+
   final List<TodoItem> _items = [];
+
+  Future<void> _saveItemsToStorage() async {
+    final prefs = await SharedPreferences.getInstance();
+    final data = _items.map((item) => item.toJson()).toList();
+    final jsonStr = jsonEncode(data);
+    debugPrint("Saving tools: $jsonStr");
+    await prefs.setString('todos', jsonStr);
+    debugPrint("Saved!");
+    
+  }
+
+  Future<void> _loadItemsFromStorage() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString('todos');
+    if (raw == null) return;
+
+    final List decoded = jsonDecode(raw);
+    setState(() {
+      _items.clear();
+      _items.addAll(decoded.map((m) => TodoItem.fromJson(m as Map<String, dynamic>)));
+    });
+  }
+
+  @override
+  void initState() {
+    super.initState();
+
+    final today = DateTime.now();
+    _dueDate = DateTime(today.year, today.month, today.day);
+
+    _dueDateCtrl.text = DateFormat('dd/MM/yy').format(_dueDate!);
+
+    _loadItemsFromStorage();
+  }
 
   @override
   void dispose() { 
@@ -43,7 +82,7 @@ class _TodoListPageState extends State<TodoListPage> {
     if (result != null) {
       setState(() {
         _dueDate = DateTime(result.year, result.month, result.day);
-        _dueDateCtrl.text = DateFormat('dd MMM yyyy').format(_dueDate!);
+        _dueDateCtrl.text = DateFormat('dd/MM/yy').format(_dueDate!);
       });
     }
   }
@@ -75,10 +114,67 @@ class _TodoListPageState extends State<TodoListPage> {
     );
   }
 
+  void _resetForm() {
+    final today = DateTime.now();
+
+    final resetDate = DateTime(today.year, today.month, today.day);
+        
+    _titleCtrl.clear();
+    _dueDate = resetDate;
+    _dueDateCtrl.text = DateFormat('dd/MM/yy').format(resetDate);
+    _priority = Priority.meduim;
+    _editingIndex = null;
+  }
+
+  void _handleSubmit() {
+    if (!(_formkey.currentState?.validate() ?? false)) return;
+
+    final itemData = TodoItem(
+      title: _titleCtrl.text.trim(), 
+      due: _dueDate,
+      priority: _priority,
+      done: _editingIndex == null
+       ? false
+       : _items[_editingIndex!].done,
+    );
+        
+    setState(() {
+      if (_editingIndex == null) {
+        _items.add(itemData);
+      } else {
+        _items[_editingIndex!] = itemData;
+      }
+    });
+
+    _saveItemsToStorage();
+
+    _resetForm();
+  }
+
+  void _startEdit(int index) {
+    final target = _items[index];
+
+    setState(() {
+      _editingIndex = index;
+      _titleCtrl.text = target.title;
+      _dueDate = target.due;
+
+      if (target.due != null) {
+        _dueDateCtrl.text = DateFormat('dd/MM/yy').format(target.due!);
+      } else {
+        _dueDateCtrl.text = '';
+      }
+
+      _priority = target.priority;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
 
     final scheme = Theme.of(context).colorScheme;
+
+    final isEditing = _editingIndex != null;
 
     return Scaffold(
       backgroundColor: scheme.surfaceContainerLowest,
@@ -115,158 +211,133 @@ class _TodoListPageState extends State<TodoListPage> {
                             width: 1,
                           )
                         ),
-                        child: Padding(
-                          padding: const EdgeInsets.all(24),
-                          child: Form(
-                            key: _formkey,
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                TextFormField(
-                                  controller: _titleCtrl,
-                                  maxLength: 40,
-                                  textInputAction: TextInputAction.next,
-                                  decoration: _input(
-                                    'ชื่องาน',
-                                    hint: 'What needs to be done?',
-                                    helper: 'อย่างน้อย 3 ตัวอักษร'
-                                    // prefixIcon: const Icon(Icons.edit_outlined)
-                                  ),
-                                  validator: (v) {
-                                    final t = v?.trim() ?? '';
-                                    if (t.isEmpty) return 'กรุณากรอกชื่องาน';
-                                    if (t.length < 3) return 'ชื่องานควรยาวเกิน 3 ตัวอักษร';
-                                    return null;
-                                  },
-                                ),
-                                const SizedBox(height: 16,),
-                                Row(
+                        child: Wrap(
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          alignment: WrapAlignment.spaceBetween,
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.all(24),
+                              child: Form(
+                                key: _formkey,
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.stretch,
                                   children: [
-                                    Expanded(
-                                      child: GestureDetector(
-                                        onTap: _pickDate,
-                                        child: AbsorbPointer(
-                                          child: TextField(
-                                            controller: _dueDateCtrl,
-                                            readOnly: true,
-                                            decoration: _input(
-                                              "",
-                                              // prefixIcon: const Icon(Icons.event_outlined),
-                                              suffixIcon: IconButton(
-                                                onPressed: _pickDate,
-                                                icon: const Icon(Icons.calendar_today_outlined),
-                                                tooltip: "เลือกวันที่",
-                                              )
+                                    TextFormField(
+                                      controller: _titleCtrl,
+                                      maxLength: 40,
+                                      textInputAction: TextInputAction.next,
+                                      decoration: _input(
+                                        'ชื่องาน',
+                                        hint: 'What needs to be done?',
+                                        helper: 'อย่างน้อย 3 ตัวอักษร'
+                                        // prefixIcon: const Icon(Icons.edit_outlined)
+                                      ),
+                                      validator: (v) {
+                                        final t = v?.trim() ?? '';
+                                        if (t.isEmpty) return 'กรุณากรอกชื่องาน';
+                                        if (t.length < 3) return 'ชื่องานควรยาวเกิน 3 ตัวอักษร';
+                                        return null;
+                                      },
+                                    ),
+                                    const SizedBox(height: 16,),
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          child: GestureDetector(
+                                            onTap: _pickDate,
+                                            child: AbsorbPointer(
+                                              child: TextField(
+                                                controller: _dueDateCtrl,
+                                                readOnly: true,
+                                                decoration: _input(
+                                                  "",
+                                                  // prefixIcon: const Icon(Icons.event_outlined),
+                                                  suffixIcon: IconButton(
+                                                    onPressed: _pickDate,
+                                                    icon: const Icon(Icons.calendar_today_outlined),
+                                                    tooltip: "เลือกวันที่",
+                                                  )
+                                                ),
+                                              ),
                                             ),
                                           ),
                                         ),
-                                      ),
-                                    ),
-                                    SizedBox(width: 12,),
-                                    Expanded(
-                                      child: DropdownButtonFormField<Priority>(
-                                        value: _priority,
-                                        decoration: _input(
-                                          '',
+                                        SizedBox(width: 12,),
+                                        Expanded(
+                                          child: DropdownButtonFormField<Priority>(
+                                            value: _priority,
+                                            decoration: _input(
+                                              '',
+                                            ),
+                                            icon: const Icon(Icons.arrow_drop_down_rounded),
+                                            // style: const TextStyle(color: Colors.red),
+                                            items: Priority.values.map((p) {
+                                              return DropdownMenuItem(
+                                                value: p,
+                                                child: Row(
+                                                  children: [
+                                                    Icon(
+                                                      Icons.circle,
+                                                      size: 10,
+                                                      color: priorityColor(p, scheme),
+                                                    ),
+                                                    const SizedBox(width: 8,),
+                                                    Text(priorityLabel(p))
+                                                  ],
+                                                )
+                                              );
+                                            }).toList(),
+                                            onChanged: (p) {
+                                              if (p != null) {
+                                                setState(() {
+                                                  _priority = p;
+                                                });
+                                              }
+                                            },
+                                          )
                                         ),
-                                        icon: const Icon(Icons.arrow_drop_down_rounded),
-                                        // style: const TextStyle(color: Colors.red),
-                                        items: Priority.values.map((p) {
-                                          return DropdownMenuItem(
-                                            value: p,
-                                            child: Row(
-                                              children: [
-                                                Icon(
-                                                  Icons.circle,
-                                                  size: 10,
-                                                  color: priorityColor(p, scheme),
-                                                ),
-                                                const SizedBox(width: 8,),
-                                                Text(priorityLabel(p))
-                                              ],
-                                            )
-                                          );
-                                        }).toList(),
-                                        onChanged: (p) {
-                                          if (p != null) {
-                                            setState(() {
-                                              _priority = p;
-                                            });
-                                          }
-                                        },
-                                      )
+                                        SizedBox(width: 12,),
+                                      ],
                                     ),
-                                    SizedBox(width: 12,),
+                                    SizedBox(height: 12,),
+                                    
+                                    SizedBox(
+                                      height: 52,
+                                      child: FilledButton.icon(
+                                        style: FilledButton.styleFrom(
+                                          backgroundColor: scheme.primary,
+                                          foregroundColor: scheme.onPrimary,
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(16),
+                                          ),
+                                          textStyle: const TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.w600
+                                          )
+                                        ),
+                                        onPressed: () {
+                                          _handleSubmit();
+                                        },
+                                        icon: Icon(isEditing ? Icons.save : Icons.add_task_rounded),
+                                        label: Text(isEditing ? "Save Change" : "Add Task"),
+                                      ), 
+                                    )
                                   ],
                                 ),
-                                SizedBox(height: 12,),
-                                
-                                SizedBox(
-                                  height: 52,
-                                  child: FilledButton.icon(
-                                    style: FilledButton.styleFrom(
-                                      backgroundColor: scheme.primary,
-                                      foregroundColor: scheme.onPrimary,
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(16),
-                                      ),
-                                      textStyle: const TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w600
-                                      )
-                                    ),
-                                    onPressed: () {
-                                      if (_formkey.currentState?.validate() ?? false) {
-                                        final newItem = TodoItem(
-                                          title: _titleCtrl.text.trim(), 
-                                          due: _dueDate,
-                                          priority: _priority,
-                                          done: false
-                                        );
-                    
-                                        setState(() {
-                                          _items.add(newItem);
-                                        });
-                    
-                                        _titleCtrl.clear();
-                                        _dueDateCtrl.clear();
-                                        _dueDate = null;
-                                        _priority = Priority.meduim;
-                    
-                                        debugPrint("SAVE TASK:");
-                                        debugPrint("title=${_titleCtrl.text}");
-                                        debugPrint("due=$_dueDate:");
-                                        debugPrint("priority=$_priority:");
-                                      }
-                                    },
-                                    icon: const Icon(Icons.add_task_rounded),
-                                    label: const Text("Add Task"),
-                                  ), 
-                                )
-                              ],
+                              ),
                             ),
-                          ),
+                          ],
                         ),
                       ),
                     ),
                     SizedBox(height: 24,),
-                    ..._items.map((item) {
+                    ..._items.asMap().entries.map((entry) {
+                      final index = entry.key;
+                      final item = entry.value;
+
                       final dueText = item.due != null
                         ? DateFormat('dd MMM yyyy').format(item.due!)
                         : "No due date";
-
-                      Color badgeBg;
-                      switch (item.priority) {
-                        case Priority.low:
-                          badgeBg = scheme.tertiary.withOpacity(0.15);
-                          break;
-                        case Priority.meduim:
-                          badgeBg = scheme.primary.withOpacity(0.15);
-                          break; 
-                        case Priority.high:
-                          badgeBg = scheme.error.withOpacity(0.15);
-                          break; 
-                      }
 
                       return Container(
                         margin: const EdgeInsets.only(bottom: 12),
@@ -285,14 +356,15 @@ class _TodoListPageState extends State<TodoListPage> {
                             InkWell(
                               onTap: () {
                                 setState(() {
-                                  final idx = _items.indexOf(item);
-                                  _items[idx] = TodoItem(
+                                  _items[index] = TodoItem(
                                     title: item.title,
                                     due: item.due,
                                     priority: item.priority,
                                     done: !item.done
                                   );
                                 });
+
+                                _saveItemsToStorage();
                               },
                               child: Container(
                                 width: 28,
@@ -324,49 +396,88 @@ class _TodoListPageState extends State<TodoListPage> {
                                           item.title, 
                                           maxLines: 1,
                                           overflow: TextOverflow.ellipsis,
-                                          style: TextStyle(fontWeight: FontWeight.w600, fontSize: 24, color: scheme.onSurface),
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.w600, 
+                                            fontSize: 20, 
+                                            color: scheme.onSurface,
+                                            decoration: item.done
+                                              ? TextDecoration.lineThrough
+                                              : TextDecoration.none
+                                          ),
                                         ),
                                       ),
                                     ],
                                   ),
                                   SizedBox(height: 6,),
-                                  Container(
-                                    padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                    decoration: BoxDecoration(
-                                      color: priorityColor(item.priority, scheme).withOpacity(0.4),
-                                      borderRadius: BorderRadius.circular(50)
-                                    ),
-                                    child: Text(priorityLabel(item.priority), style: TextStyle(color: priorityColor(item.priority, scheme), fontSize: 16, fontWeight: FontWeight.w500),)
+                                  Row(
+                                    children: [
+                                      Container(
+                                        padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                        decoration: BoxDecoration(
+                                          color: priorityColor(item.priority, scheme).withOpacity(0.4),
+                                          borderRadius: BorderRadius.circular(50)
+                                        ),
+                                        child: Text(priorityLabel(item.priority), style: TextStyle(color: priorityColor(item.priority, scheme), fontSize: 12, fontWeight: FontWeight.w500),)
+                                      ),
+                                      SizedBox(width: 6,),
+                                      Container(
+                                        padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                        decoration: BoxDecoration(
+                                          color: scheme.onSurfaceVariant.withOpacity(0.5),
+                                          borderRadius: BorderRadius.circular(50)
+                                        ),
+                                        child: Text(dueText, style: TextStyle(color: scheme.surfaceVariant, fontSize: 12, fontWeight: FontWeight.w500),)
+                                      ),
+                                    ],
                                   )
                                 ],
                               ),
                             ),
                             Row(
                               children: [
-                                Container(
-                                  decoration: BoxDecoration(
-                                    color: Colors.yellow.shade600,
-                                    borderRadius: BorderRadius.circular(12)
+                                IconButton.outlined(
+                                  style: IconButton.styleFrom(
+                                    padding: const EdgeInsets.all(8),
+                                    side: BorderSide(
+                                      color: Colors.yellow,
+                                      width: 1
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadiusGeometry.circular(12)
+                                    ),
+                                    foregroundColor: Colors.white,
+                                    backgroundColor: Colors.yellow.shade600
                                   ),
-                                  child: IconButton(
-                                    onPressed: () {}, 
-                                    icon: const Icon(Icons.edit, color: Colors.white,)
-                                  ),
+                                  onPressed: () {
+                                    _startEdit(index);
+                                  }, 
+                                  icon: const Icon(Icons.edit, size: 20,)
                                 ),
-                                SizedBox(width: 6,),
-                                Container(
-                                  decoration: BoxDecoration(
-                                    color: Colors.red.shade600,
-                                    borderRadius: BorderRadius.circular(12)
+                                // SizedBox(width: ,),
+                                IconButton.outlined(
+                                  style: IconButton.styleFrom(
+                                    padding: const EdgeInsets.all(8),
+                                    side: BorderSide(
+                                      color: Colors.yellow,
+                                      width: 1
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadiusGeometry.circular(12)
+                                    ),
+                                    foregroundColor: Colors.white,
+                                    backgroundColor: Colors.red.shade600
                                   ),
-                                  child: IconButton(
-                                    onPressed: () {
-                                      setState(() {
-                                        _items.remove(item);
-                                      });
-                                    }, 
-                                    icon: const Icon(Icons.delete, color: Colors.white,)
-                                  ),
+                                  onPressed: () {
+                                    setState(() {
+                                      if (_editingIndex == index) {
+                                        _resetForm();
+                                      }
+                                      _items.removeAt(index);
+                                    });
+
+                                    _saveItemsToStorage();
+                                  }, 
+                                  icon: const Icon(Icons.delete, color: Colors.white, size: 20,)
                                 ),
                               ],
                             )
