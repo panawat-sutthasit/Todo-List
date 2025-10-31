@@ -120,6 +120,7 @@ class _AddTaskPageState extends State<AddTaskPage> {
                     height: h,
                     width: 140,
                     child: DropdownButtonFormField<TaskPriority>(
+                      // ignore: deprecated_member_use
                       value: _priority,
                       items: const [
                         DropdownMenuItem(value: TaskPriority.low, child: Text('Low')),
@@ -233,6 +234,7 @@ class _AddTaskPageState extends State<AddTaskPage> {
               child: Column(
                 children: [
                   Icon(Icons.edit_note,
+                      // ignore: deprecated_member_use
                       size: 64, color: theme.colorScheme.primary.withOpacity(.35)),
                   const SizedBox(height: 8),
                   Text('No tasks yet', style: theme.textTheme.titleMedium),
@@ -285,6 +287,7 @@ class _AddTaskPageState extends State<AddTaskPage> {
                             const SizedBox(width: 8),
                             Expanded(
                               child: DropdownButtonFormField<TaskPriority>(
+                                // ignore: deprecated_member_use
                                 value: pp,
                                 items: const [
                                   DropdownMenuItem(value: TaskPriority.low, child: Text('Low')),
