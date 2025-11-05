@@ -124,17 +124,17 @@ class _DashboardPageState extends State<DashboardPage> {
                 theme,
                 color: const Color(0xFFEF4444),
               ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Container(
-                  height: 48,
-                  alignment: Alignment.centerRight,
-                  child: Text(
-                    'Selected: ${DateFormat('dd MMM yyyy').format(selected)}',
-                    style: theme.textTheme.bodySmall,
-                  ),
-                ),
-              ),
+              // const SizedBox(width: 8),
+              // Expanded(
+              //   child: Container(
+              //     height: 48,
+              //     alignment: Alignment.centerRight,
+              //     child: Text(
+              //       'Selected: ${DateFormat('dd MMM yyyy').format(selected)}',
+              //       style: theme.textTheme.bodySmall,
+              //     ),
+              //   ),
+              // ),
             ],
           ),
 
