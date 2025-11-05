@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -41,10 +42,9 @@ class ToDoApp extends StatelessWidget {
             bodyMedium: TextStyle(color: text, fontSize: 14),
           ),
           inputDecorationTheme: InputDecorationTheme(
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
             border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.all(Radius.circular(16)),
             ),
           ),
           filledButtonTheme: FilledButtonThemeData(
@@ -52,17 +52,71 @@ class ToDoApp extends StatelessWidget {
               backgroundColor: primary,
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.all(Radius.circular(16)),
               ),
             ),
           ),
           chipTheme: ChipThemeData(
-            shape: StadiumBorder(
-              side: BorderSide(color: const Color(0xFFE2E8F0)),
+            shape: const StadiumBorder(
+              side: BorderSide(color: Color(0xFFE2E8F0)),
             ),
           ),
         ),
-        home: const AppShell(),
+        // เริ่มที่ Splash ก่อน แล้วค่อยเข้า AppShell
+        home: const SplashScreen(),
+      ),
+    );
+  }
+}
+
+/// Splash ก่อนเข้าแอพ ~2.5 วิ
+class SplashScreen extends StatefulWidget {
+  const SplashScreen({super.key});
+  @override
+  State<SplashScreen> createState() => _SplashScreenState();
+}
+
+class _SplashScreenState extends State<SplashScreen> {
+  @override
+  void initState() {
+    super.initState();
+    Timer(const Duration(milliseconds: 2500), () {
+      if (!mounted) return;
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => const AppShell()),
+      );
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Scaffold(
+      backgroundColor: scheme.primary,
+      body: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.task_alt, size: 96, color: Colors.white),
+            const SizedBox(height: 16),
+            const Text(
+              'To-Do-List App',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 24,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: 140,
+              child: LinearProgressIndicator(
+                color: Colors.white,
+                backgroundColor: Colors.white24,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -154,6 +208,7 @@ class _BottomNav extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
+              const SizedBox(height: 2),
               Icon(icon, color: Colors.white),
               const SizedBox(height: 4),
               Text(

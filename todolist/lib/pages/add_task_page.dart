@@ -15,6 +15,8 @@ class AddTaskPage extends StatefulWidget {
 
 class _AddTaskPageState extends State<AddTaskPage> {
   final _title = TextEditingController();
+  final _dueCtrl = TextEditingController();
+
   DateTime? _due;
   TaskPriority _priority = TaskPriority.low;
 
@@ -24,11 +26,13 @@ class _AddTaskPageState extends State<AddTaskPage> {
     // ตั้งค่า Due Date เป็น "วันนี้" ทันที
     final now = DateTime.now();
     _due = DateTime(now.year, now.month, now.day);
+    _dueCtrl.text = DateFormat('dd/MM/yyyy').format(_due!);
   }
 
   @override
   void dispose() {
     _title.dispose();
+    _dueCtrl.dispose();
     super.dispose();
   }
 
@@ -48,17 +52,25 @@ class _AddTaskPageState extends State<AddTaskPage> {
 
   Future<void> _pickDate() async {
     final now = DateTime.now();
+    final todayStart = DateTime(now.year, now.month, now.day);
+
     final picked = await showDatePicker(
       context: context,
-      firstDate: DateTime(now.year - 1),
-      lastDate: DateTime(now.year + 3),
-      initialDate: _due ?? now,
+      // ❗ ล็อคไม่ให้เลือกวันที่ย้อนหลัง
+      firstDate: todayStart,
+      lastDate: DateTime(now.year + 5, 12, 31),
+      initialDate: (_due != null && _due!.isAfter(todayStart)) ? _due! : todayStart,
       helpText: 'เลือกวันที่',
       cancelText: 'ยกเลิก',
       confirmText: 'ตกลง',
     );
+
     if (picked != null) {
-      setState(() => _due = DateTime(picked.year, picked.month, picked.day));
+      final normalized = DateTime(picked.year, picked.month, picked.day);
+      setState(() {
+        _due = normalized;
+        _dueCtrl.text = DateFormat('dd/MM/yyyy').format(normalized);
+      });
     }
   }
 
@@ -73,20 +85,29 @@ class _AddTaskPageState extends State<AddTaskPage> {
       return;
     }
 
+    // กันกรณี _due เป็นอดีต (เช่น ได้มาจาก state เก่า / import)
+    final now = DateTime.now();
+    final todayStart = DateTime(now.year, now.month, now.day);
+    DateTime effectiveDue = _due ?? todayStart;
+    if (effectiveDue.isBefore(todayStart)) {
+      effectiveDue = todayStart;
+    }
+
     final newTask = Task(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       title: text,
-      due: _due,
+      due: effectiveDue,
       priority: _priority,
     );
+
     await context.read<TaskProvider>().add(newTask);
 
-    // รีเซ็ตฟอร์ม: ตั้งวันกลับเป็น "วันนี้" (ไม่ปล่อยให้เป็น null)
-    final now = DateTime.now();
+    // รีเซ็ตฟอร์ม: ตั้งวันกลับเป็น "วันนี้"
     _title.clear();
     setState(() {
-      _due = DateTime(now.year, now.month, now.day);
       _priority = TaskPriority.low;
+      _due = todayStart;
+      _dueCtrl.text = DateFormat('dd/MM/yyyy').format(todayStart);
     });
   }
 
@@ -115,9 +136,6 @@ class _AddTaskPageState extends State<AddTaskPage> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final provider = context.watch<TaskProvider>();
-
-    // ข้อความวันที่
-    final dueText = _due == null ? '' : DateFormat('dd/MM/yyyy').format(_due!);
 
     return Scaffold(
       backgroundColor: theme.colorScheme.surfaceContainerLowest,
@@ -174,7 +192,7 @@ class _AddTaskPageState extends State<AddTaskPage> {
                                   child: AbsorbPointer(
                                     child: TextField(
                                       readOnly: true,
-                                      controller: TextEditingController(text: dueText),
+                                      controller: _dueCtrl,
                                       decoration: InputDecoration(
                                         hintText: 'Due Date',
                                         suffixIcon: IconButton(
@@ -382,11 +400,12 @@ class _AddTaskPageState extends State<AddTaskPage> {
                                     child: OutlinedButton.icon(
                                       onPressed: () async {
                                         final now = DateTime.now();
+                                        final todayStart = DateTime(now.year, now.month, now.day);
                                         final picked = await showDatePicker(
                                           context: context,
-                                          firstDate: DateTime(now.year - 1),
-                                          lastDate: DateTime(now.year + 5),
-                                          initialDate: dd ?? now,
+                                          firstDate: todayStart, // ล็อคไม่ให้ย้อนหลัง
+                                          lastDate: DateTime(now.year + 5, 12, 31),
+                                          initialDate: dd ?? todayStart,
                                         );
                                         if (picked != null) {
                                           dd = DateTime(picked.year, picked.month, picked.day);
