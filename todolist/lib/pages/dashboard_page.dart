@@ -108,7 +108,7 @@ class _DashboardPageState extends State<DashboardPage> {
           // Summary (อิง "วัน" ที่เลือก)
           Row(
             children: [
-              _summaryCard('TOTAL (SELECTED)', '$totalDay', theme),
+              _summaryCard('TOTAL', '$totalDay', theme),
               const SizedBox(width: 8),
               _summaryCard('COMPLETED', '$completedDay', theme),
               const SizedBox(width: 8),
@@ -203,7 +203,7 @@ class _DashboardPageState extends State<DashboardPage> {
                         TextButton.icon(
                           onPressed: _goToday,
                           icon: const Icon(Icons.calendar_today, size: 16),
-                          label: const Text('Today'),
+                          label: const Text(''),
                         ),
                       ],
                     ),
