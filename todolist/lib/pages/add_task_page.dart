@@ -19,6 +19,14 @@ class _AddTaskPageState extends State<AddTaskPage> {
   TaskPriority _priority = TaskPriority.low;
 
   @override
+  void initState() {
+    super.initState();
+    // ตั้งค่า Due Date เป็น "วันนี้" ทันที
+    final now = DateTime.now();
+    _due = DateTime(now.year, now.month, now.day);
+  }
+
+  @override
   void dispose() {
     _title.dispose();
     super.dispose();
@@ -50,7 +58,7 @@ class _AddTaskPageState extends State<AddTaskPage> {
       confirmText: 'ตกลง',
     );
     if (picked != null) {
-      setState(() => _due = picked);
+      setState(() => _due = DateTime(picked.year, picked.month, picked.day));
     }
   }
 
@@ -72,9 +80,12 @@ class _AddTaskPageState extends State<AddTaskPage> {
       priority: _priority,
     );
     await context.read<TaskProvider>().add(newTask);
+
+    // รีเซ็ตฟอร์ม: ตั้งวันกลับเป็น "วันนี้" (ไม่ปล่อยให้เป็น null)
+    final now = DateTime.now();
     _title.clear();
     setState(() {
-      _due = null;
+      _due = DateTime(now.year, now.month, now.day);
       _priority = TaskPriority.low;
     });
   }
@@ -106,8 +117,7 @@ class _AddTaskPageState extends State<AddTaskPage> {
     final provider = context.watch<TaskProvider>();
 
     // ข้อความวันที่
-    final dueText =
-        _due == null ? '' : DateFormat('dd/MM/yyyy').format(_due!);
+    final dueText = _due == null ? '' : DateFormat('dd/MM/yyyy').format(_due!);
 
     return Scaffold(
       backgroundColor: theme.colorScheme.surfaceContainerLowest,
@@ -378,7 +388,9 @@ class _AddTaskPageState extends State<AddTaskPage> {
                                           lastDate: DateTime(now.year + 5),
                                           initialDate: dd ?? now,
                                         );
-                                        if (picked != null) dd = picked;
+                                        if (picked != null) {
+                                          dd = DateTime(picked.year, picked.month, picked.day);
+                                        }
                                       },
                                       icon: const Icon(Icons.calendar_today, size: 18),
                                       label: Text(
@@ -394,12 +406,9 @@ class _AddTaskPageState extends State<AddTaskPage> {
                                       // ignore: deprecated_member_use
                                       value: pp,
                                       items: const [
-                                        DropdownMenuItem(
-                                            value: TaskPriority.low, child: Text('Low')),
-                                        DropdownMenuItem(
-                                            value: TaskPriority.medium, child: Text('Medium')),
-                                        DropdownMenuItem(
-                                            value: TaskPriority.high, child: Text('High')),
+                                        DropdownMenuItem(value: TaskPriority.low, child: Text('Low')),
+                                        DropdownMenuItem(value: TaskPriority.medium, child: Text('Medium')),
+                                        DropdownMenuItem(value: TaskPriority.high, child: Text('High')),
                                       ],
                                       onChanged: (v) => pp = v ?? TaskPriority.low,
                                       decoration: const InputDecoration(labelText: 'Priority'),
@@ -429,7 +438,7 @@ class _AddTaskPageState extends State<AddTaskPage> {
                         ),
                       );
                     },
-                    // ❌ ไม่ส่ง onDelete เพื่อไม่ให้มี dialog ซ้ำ
+                    // ไม่ส่ง onDelete เพื่อไม่ให้มี dialog ซ้ำ (TaskCard มี dialog ของตัวเอง)
                   ),
                 ),
               const SizedBox(height: 100),
