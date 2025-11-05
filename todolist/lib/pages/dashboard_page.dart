@@ -19,7 +19,7 @@ class _DashboardPageState extends State<DashboardPage> {
   DateTime _focusedDay = DateTime.now();
   DateTime? _selectedDay;
 
-  // ค่าเดือน/ปี ที่แสดงในดรอปดาวน์
+  // ค่าเดือน/ปี สำหรับดรอปดาวน์
   late int _visibleMonth;
   late int _visibleYear;
 
@@ -32,7 +32,7 @@ class _DashboardPageState extends State<DashboardPage> {
     _visibleYear = _focusedDay.year;
   }
 
-  // เลื่อนเดือน (ข้ามปีได้)
+  // เลื่อนเดือน (+/-) ข้ามปีได้
   void _changeMonth(int delta) {
     final d = DateTime(_visibleYear, _visibleMonth + delta, 1);
     setState(() {
@@ -58,22 +58,29 @@ class _DashboardPageState extends State<DashboardPage> {
     final provider = context.watch<TaskProvider>();
     final theme = Theme.of(context);
 
-    // ช่วงปีให้เลือก
+    // สร้างรายการเดือน/ปีสำหรับดรอปดาวน์
     final int startYear = DateTime.now().year - 5;
     final int endYear = DateTime.now().year + 5;
     final months = List.generate(12, (i) => i + 1);
     final years = List.generate(endYear - startYear + 1, (i) => startYear + i);
 
-    // ตัวเลขสรุป
-    final total = provider.tasks.length;
-    final completed = provider.tasks.where((t) => t.isDone == true).length;
-    final pending = provider.tasks.where((t) => t.isDone != true).length;
+    // ====== คำนวณสรุป "เฉพาะวัน" ที่เลือก ======
+    final selected = _selectedDay ?? DateTime.now();
+    final tasksOfDay = provider.tasksOn(selected);
+    final totalDay = tasksOfDay.length;
+    final completedDay = tasksOfDay.where((t) => t.isDone).length;
+    final pendingDay = totalDay - completedDay;
 
-    // สำหรับปฏิทิน: ดึงงานของแต่ละวันเป็น event markers
+    // ====== Overdue (ทั้งระบบ) ======
+    final now = DateTime.now();
+    final todayOnly = DateTime(now.year, now.month, now.day);
+    final overdueAll = provider.tasks
+        .where((t) => !t.isDone && t.due != null && t.due!.isBefore(todayOnly))
+        .length;
+
+    // event markers บนปฏิทิน
     // ignore: no_leading_underscores_for_local_identifiers
     List<dynamic> _eventsLoader(DateTime day) => provider.tasksOn(day);
-
-    final tasksForSelectedDay = provider.tasksOn(_selectedDay ?? DateTime.now());
 
     return SafeArea(
       child: ListView(
@@ -88,7 +95,7 @@ class _DashboardPageState extends State<DashboardPage> {
             ),
             alignment: Alignment.center,
             child: const Text(
-              'My Tasks Dashboard ',
+              'My Tasks Dashboard',
               style: TextStyle(
                 color: Colors.white,
                 fontWeight: FontWeight.w700,
@@ -98,19 +105,42 @@ class _DashboardPageState extends State<DashboardPage> {
           ),
           const SizedBox(height: 12),
 
-          // Summary cards
+          // Summary (อิง "วัน" ที่เลือก)
           Row(
             children: [
-              _summaryCard('TOTAL TASKS', total.toString(), theme),
+              _summaryCard('TOTAL (SELECTED)', '$totalDay', theme),
               const SizedBox(width: 8),
-              _summaryCard('COMPLETED', completed.toString(), theme),
+              _summaryCard('COMPLETED', '$completedDay', theme),
               const SizedBox(width: 8),
-              _summaryCard('PENDING', pending.toString(), theme),
+              _summaryCard('PENDING', '$pendingDay', theme),
             ],
           ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              _summaryCard(
+                'OVERDUE (ALL)',
+                '$overdueAll',
+                theme,
+                color: const Color(0xFFEF4444),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Container(
+                  height: 48,
+                  alignment: Alignment.centerRight,
+                  child: Text(
+                    'Selected: ${DateFormat('dd MMM yyyy').format(selected)}',
+                    style: theme.textTheme.bodySmall,
+                  ),
+                ),
+              ),
+            ],
+          ),
+
           const SizedBox(height: 12),
 
-          // ปฏิทิน + แถบควบคุมเดือน/ปี/Today
+          // ปฏิทิน + แถบควบคุม
           Card(
             elevation: 2,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -118,7 +148,7 @@ class _DashboardPageState extends State<DashboardPage> {
               padding: const EdgeInsets.all(8),
               child: Column(
                 children: [
-                  // แถบควบคุม
+                  // แถบควบคุมเดือน/ปี/Today
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                     decoration: BoxDecoration(
@@ -132,7 +162,6 @@ class _DashboardPageState extends State<DashboardPage> {
                           onPressed: () => _changeMonth(-1),
                           icon: const Icon(Icons.chevron_left),
                         ),
-                        // เดือน
                         DropdownButton<int>(
                           value: _visibleMonth,
                           underline: const SizedBox.shrink(),
@@ -151,7 +180,6 @@ class _DashboardPageState extends State<DashboardPage> {
                               .toList(),
                         ),
                         const SizedBox(width: 8),
-                        // ปี
                         DropdownButton<int>(
                           value: _visibleYear,
                           underline: const SizedBox.shrink(),
@@ -163,7 +191,7 @@ class _DashboardPageState extends State<DashboardPage> {
                             });
                           },
                           items: years
-                              .map((y) => DropdownMenuItem(value: y, child: Text(y.toString())))
+                              .map((y) => DropdownMenuItem(value: y, child: Text('$y')))
                               .toList(),
                         ),
                         IconButton(
@@ -182,7 +210,6 @@ class _DashboardPageState extends State<DashboardPage> {
                   ),
                   const SizedBox(height: 8),
 
-                  // ปฏิทิน (ใช้ header แบบ custom ด้านบน)
                   TableCalendar<dynamic>(
                     headerVisible: false,
                     firstDay: DateTime(2000, 1, 1),
@@ -235,31 +262,28 @@ class _DashboardPageState extends State<DashboardPage> {
 
           const SizedBox(height: 12),
 
-          // งานของวันที่เลือก
-          if (_selectedDay != null) ...[
-            Text(
-              'Tasks on ${DateFormat('dd MMM yyyy').format(_selectedDay!)}',
-              style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
-            ),
-            const SizedBox(height: 8),
+          // งานของ "วันที่เลือก"
+          Text(
+            'Tasks on ${DateFormat('dd MMM yyyy').format(selected)}',
+            style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 8),
 
-            if (tasksForSelectedDay.isNotEmpty)
-              ...tasksForSelectedDay.map(
-                (t) => TaskCard(
-                  task: t,
-                  onEdit: () async {
-                    // เลือกแก้ไขผ่านหน้า AddTask/หรือ dialog ในหน้ารายการก็ได้
-                  },
-                  // สำคัญ: ส่ง onDelete ให้ TaskCard (TaskCard จะขึ้น dialog ยืนยันเอง)
-                  onDelete: () async {
-                    await provider.removeById(t.id);
-                  },
-                ),
-              )
-            else
-              const Text('No tasks on this day.'),
-          ] else
-            const SizedBox.shrink(),
+          if (tasksOfDay.isNotEmpty)
+            ...tasksOfDay.map(
+              (t) => TaskCard(
+                task: t,
+                onEdit: () async {
+                  // สามารถเปิด dialog แก้ไขที่หน้า AddTask ก็ได้หากต้องการ
+                },
+                onDelete: () async {
+                  // เรียกเมธอดลบใน provider (ตั้งชื่อตามโปรเจกต์ของฟูกิ)
+                  await provider.delete(t.id);
+                },
+              ),
+            )
+          else
+            const Text('No tasks on this day.'),
 
           const SizedBox(height: 100),
         ],
@@ -267,7 +291,8 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
-  Widget _summaryCard(String label, String value, ThemeData theme) {
+  Widget _summaryCard(String label, String value, ThemeData theme, {Color? color}) {
+    final fg = color ?? theme.colorScheme.onSurface;
     return Expanded(
       child: Container(
         height: 72,
@@ -282,9 +307,9 @@ class _DashboardPageState extends State<DashboardPage> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text(value, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18)),
+            Text(value, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18, color: fg)),
             const SizedBox(height: 2),
-            Text(label, style: theme.textTheme.labelSmall),
+            Text(label, style: theme.textTheme.labelSmall?.copyWith(color: fg), textAlign: TextAlign.center),
           ],
         ),
       ),
