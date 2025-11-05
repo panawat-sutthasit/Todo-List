@@ -34,7 +34,7 @@ class _SplashScreenState extends State<SplashScreen> {
             const Icon(Icons.task_alt, size: 96, color: Colors.white),
             const SizedBox(height: 16),
             const Text(
-              'To-Do-List App',
+              'ToDo-List App',
               style: TextStyle(
                 color: Colors.white,
                 fontSize: 24,
