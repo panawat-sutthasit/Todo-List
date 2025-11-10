@@ -211,9 +211,14 @@ class _AddTaskPageState extends State<AddTaskPage> {
                                   ),
                                 ),
                                 const SizedBox(height: 6),
-                                const Text(
-                                  'เลือกวันที่',
-                                  style: TextStyle(fontSize: 12, color: Colors.black54),
+                                Row(
+                                  children: [
+                                    const SizedBox(width: 20),
+                                    const Text(
+                                      'เลือกวันที่',
+                                      style: TextStyle(fontSize: 12, color: Colors.black54),
+                                    ),
+                                  ],
                                 ),
                               ],
                             ),
@@ -273,9 +278,14 @@ class _AddTaskPageState extends State<AddTaskPage> {
                                   ),
                                 ),
                                 const SizedBox(height: 6),
-                                const Text(
-                                  'ระดับความสำคัญของงาน',
-                                  style: TextStyle(fontSize: 12, color: Colors.black54),
+                                Row(
+                                  children: [
+                                    const SizedBox(width: 20,),
+                                    const Text(
+                                      'ระดับความสำคัญของงาน',
+                                      style: TextStyle(fontSize: 12, color: Colors.black54),
+                                    ),
+                                  ],
                                 ),
                               ],
                             ),
