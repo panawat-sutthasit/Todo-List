@@ -1,0 +1,194 @@
+// Dependencies แพ็กเกจหรือไลบรารี หลักที่แอปใช้ตอนรันจริง //
+
+คำสั่งที่ใช้ในการติดตั้ง แพ็กเกจหรือไลบรารี ที่เพิ่มเข้ามา
+
+    // flutter pub add provider shared_preferences table_calendar intl flutter_launcher_icons //
+-----------------------------------------------------------------------------------------------------------------------------------
+
+// แพ็คเกจที่เพิ่มเข้ามาเอง //
+1. provider: ^6.1.5+1
+    หน้าที่ของแพ็กเกจ
+        - ใช้สำหรับ State Management (จัดการสถานะของข้อมูลในแอป)
+        - ทำให้เราสามารถเก็บ / อัปเดต / กระจายข้อมูล (เช่น รายการ Task) ไปยังหลายหน้าได้ง่าย
+          โดยไม่ต้องส่งตัวแปรผ่าน Constructor ยาว ๆ
+    
+    ในโปรเจกต์นี้ใช้ทำอะไร
+        - ใช้ครอบ MaterialApp ด้วย ChangeNotifierProvider เพื่อให้ทั้งแอปมองเห็น TaskProvider
+                return ChangeNotifierProvider(
+                    create: (_) => TaskProvider()..load(),
+                    hild: MaterialApp(
+                    ...
+                ),
+            );
+
+    ใช้ในหน้า: add_task_page.dart , dashboard_page.dart , task_card.dart
+
+    เอาไว้: 
+        - ดึงรายการงาน: context.watch<TaskProvider>().tasks
+        - เพิ่มงาน: context.read<TaskProvider>().add(newTask)
+        - อัปเดต / ลบงาน: update(), delete(), toggleDone()
+        - เปลี่ยน filter / ค้นหา: setFilter(), setSearch()
+    เหตุผลที่เลือกใช้
+        - ทำให้แยก “ข้อมูล” (TaskProvider) ออกจาก “หน้าจอ UI” ชัดเจน (ตามหลัก MVVM / clean architecture ง่าย ๆ)
+        - เวลาอัปเดตข้อมูล (เพิ่ม/ลบ/ติ๊กเสร็จ) UI จะรีเฟรชเอง เพราะ notifyListeners()
+        - โค้ดสั้นกว่าใช้ setState() ทั่วแอป และดูเป็นโปรเจกต์จริงจังมากขึ้น (อาจารย์ชอบ)
+
+---------------------------------------------------------------------------------------------------------------------------------
+
+2. shared_preferences: ^2.5.3
+    หน้าที่ของแพ็กเกจ
+        - ใช้เก็บข้อมูลแบบ Key–Value ลงบนเครื่องผู้ใช้ (เหมือน local storage)
+        - ข้อมูลจะยังอยู่แม้ปิดแอป / เปิดใหม่ (Persistent storage)
+    ในโปรเจกต์นี้ใช้ทำอะไร
+        - ใช้เก็บรายการ Task ทั้งหมดลงในเครื่องเพื่อให้ “ปิดแอปแล้ว เปิดใหม่ ข้อมูลงานยังอยู่เหมือนเดิม”
+        - ใช้อยู่ใน task_provider.dart
+                static const _storeKey = 'tasks_v1';           // ชื่อ key สำหรับเก็บ JSON
+                final List<Task> _tasks = [];                  // ลิสต์งานทั้งหมดในแอป
+    ตอนโหลด:
+                final prefs = await SharedPreferences.getInstance();
+                final data = prefs.getString(_storeKey);
+                if (data != null) {
+                    _tasks
+                        ..clear()
+                        ..addAll(Task.decodeList(data));          // แปลง JSON -> List<Task>
+                    notifyListeners();
+                }
+    ตอนบันทึก: await prefs.setString(_storeKey, Task.encodeList(_tasks)); // List<Task> -> JSON
+    เหตุผลที่เลือกใช้:
+            - ง่ายมาก ไม่ต้องต่อ Database หรือเขียนไฟล์เอง
+            - เหมาะกับแอปเล็ก–กลาง ที่ต้องการเก็บข้อมูลแบบไม่ซับซ้อน
+            - เพียงพอสำหรับโปรเจกต์ To-Do List ที่เก็บงานเป็นรายการ ๆ
+
+---------------------------------------------------------------------------------------------------------------------------------------
+
+3. table_calendar: ^3.2.0
+    หน้าที่ของแพ็กเกจ:
+        - ใช้สร้าง ปฏิทินแบบเต็มเดือน ที่สามารถเลือกวัน และแสดง event (งาน) ได้
+        - มีฟังก์ชันช่วยเรื่อง UI ปฏิทิน เช่น เลือกวัน / swipe เปลี่ยนเดือน / แสดง marker
+    ในโปรเจกต์นี้ใช้ทำอะไร:
+        - ใช้ใน dashboard_page.dart เพื่อทำ หน้า Dashboard + Calendar View
+        - เอางานที่มีวันที่กำหนด (due date) มาแสดงบนปฏิทิน และเมื่อกดเลือกวัน ก็จะแสดงรายการ Task ของวันนั้นด้านล่าง
+    ตัวอย่าง:
+            TableCalendar<dynamic>(
+                headerVisible: false,                       // ซ่อน header เดิม ใช้แถบ custom แทน
+                firstDay: DateTime(2000, 1, 1),
+                lastDay: DateTime(2100, 12, 31),
+                focusedDay: DateTime(_visibleYear, _visibleMonth, 1),
+                selectedDayPredicate: (day) =>
+                    _selectedDay != null &&
+                    day.year == _selectedDay!.year &&
+                    day.month == _selectedDay!.month &&
+                    day.day == _selectedDay!.day,
+                onDaySelected: (selectedDay, focusedDay) {
+                    setState(() {
+                        _selectedDay = selectedDay;             // เก็บวันปัจจุบันที่เลือก
+                        _focusedDay = focusedDay;
+                     });
+                    },
+                    eventLoader: (day) => provider.tasksOn(day), // ดึงงานของวันนั้นมาเป็น event
+                    calendarFormat: CalendarFormat.month,
+                    ...
+                );
+    เหตุผลที่เลือกใช้ : 
+            - ถ้าจะเขียนปฏิทินเองทั้งอัน จะยุ่งยากมาก ทั้งเรื่องการจัด grid, การเปลี่ยนเดือน, ข้ามปี ฯลฯ
+            - table_calendar ทำให้
+                - ได้ UI ที่สวย ดูเป็น app จริง
+                - แค่ใส่ eventLoader และจัดสไตล์เล็กน้อย ก็แสดงงานตามวันได้เลย
+
+-------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+4. intl: ^0.20.2
+    หน้าที่ของแพ็กเกจ:
+        - ใช้จัดการเรื่อง รูปแบบวันที่ เวลา และตัวเลข ตาม Locale
+        - ใช้คลาส DateFormat เพื่อแปลง DateTime เป็น String ที่อ่านง่าย
+    ในโปรเจกต์นี้ใช้ทำอะไร
+        - ในโปรเจกต์นี้ใช้ทำอะไร
+            - add_task_page.dart
+            - dashboard_page.dart
+            - task_card.dart
+        - เพื่อแสดงวันที่สวย ๆ เช่น
+            - dd/MM/yyyy → 20/11/2025
+            - dd MMM yyyy → 20 Nov 2025
+    ตัวอย่าง:
+        _dueCtrl.text = DateFormat('dd/MM/yyyy').format(_due!);
+        
+        Text(
+            'Tasks on ${DateFormat('dd MMM yyyy').format(selected)}',
+        );
+
+        Text(
+            DateFormat('dd/MM/yyyy').format(task.due!),
+        );
+    เหตุผลที่เลือกใช้:
+        - ถ้า format เองด้วย string + concat จะอ่านยากและเสี่ยงผิด
+        - intl ทำให้จัดรูปแบบวันที่ได้มาตรฐานและแก้ทีเดียวได้ในทุกจุด
+        - เป็นแพ็กเกจที่นิยมใช้ในโปรเจกต์ Flutter ที่เกี่ยวกับวันที่/เวลา
+
+-----------------------------------------------------------------------------------------------------------------------------------
+
+5. flutter_launcher_icons: ^0.13.1
+    หน้าที่ของแพ็กเกจ:
+        - ใช้สำหรับ สร้าง App Icon อัตโนมัติ ทั้ง Android/iOS จากไฟล์รูปเดียว (เช่น assets/icon_todolist.png)
+    ในโปรเจกต์นี้ ตั้งค่าไว้ใน pubspec.yaml ประมาณนี้ :
+        flutter_launcher_icons:
+            android: true
+            ios: true
+            image_path: "assets_images/icon_todolist.png"
+            min_sdk_android: 21
+            remove_alpha_ios: true
+    จากนั้นใช้คำสั่ง เพื่อ generate icon ให้ทุกขนาด เช่น :
+            flutter pub run flutter_launcher_icons
+    เหตุผลที่ใช้ : 
+            - ให้แอปมี ไอคอนของตัวเอง ไม่ใช้ default ของ Flutter (ไอคอนฟ้า ๆ)
+            - ดูเป็นแอปที่ออกแบบมาจริง ไม่ใช่แค่โปรเจกต์ทดลอง
+
+------------------------------------------------------------------------------------------------------------------------------------------
+
+///// แพ็กเกจที่ Flutter ใส่มาให้อัตโนมัติ /////
+
+6. cupertino_icons: ^1.0.8
+    หน้าที่ของแพ็กเกจ:
+            - เป็นชุด ไอคอนสไตล์ iOS (Cupertino Icons) ของ Flutter
+            - ให้เราสามารถใช้ไอคอนแนว Apple ได้ เช่น icons แบบ iOS
+
+    ในโปรเจกต์นี้:
+            - ตอนนี้ยังไม่ได้เรียกใช้โดยตรงในโค้ด (ส่วนใหญ่ใช้ Icons.xxx ของ Material)
+            - แต่เป็นแพ็กเกจมาตรฐานที่มักติดมากับโปรเจกต์ใหม่ เผื่อใช้ในอนาคต
+    เหตุผลที่มีอยู่:
+        - มาพร้อม template ของ Flutter (เวลา flutter create)
+        - ถ้าต้องการ UI แนว iOS เพิ่มเติม เช่น หน้า Settings หรือ Tab bar สไตล์ iOS สามารถใช้ไอคอนจากแพ็กเกจนี้ได้เลย
+
+--------------------------------------------------------------------------------------------------------------------------------------------
+
+Dev Dependencies (ใช้ตอนพัฒนา / build เท่านั้น)
+
+7. flutter_test
+    หน้าที่ของแพ็กเกจ:
+        - ใช้เขียน Unit test / Widget test สำหรับ Flutter
+        - ช่วยทดสอบ logic และ UI โดยไม่ต้องรันบนมือถือจริงทุกครั้ง
+    ในโปรเจกต์นี้:
+        - ยังไม่ได้เขียนเทสเพิ่ม แต่เป็นแพ็กเกจ default ของ Flutter project
+    เหตุผลที่มี:
+        - ติดมากับโปรเจกต์ตั้งแต่แรก
+        - ใช้ได้ถ้าในอนาคตอยากเขียนเทส เช่น ทดสอบ TaskProvider หรือ UI
+
+--------------------------------------------------------------------------------------------------------------------------------------------
+
+8. flutter_lints: ^5.0.0
+    หน้าที่ของแพ็กเกจ:
+        - ใช้กำหนด มาตรฐานการเขียนโค้ด (Lint Rules)
+        - ทำให้ VS Code / Android Studio แจ้งเตือนโค้ดที่อาจเสี่ยง หรือเขียนไม่ตามมาตรฐาน
+    ในโปรเจกต์นี้:
+        - อยู่ใน dev_dependencies และถูกอ้างถึงใน analysis_options.yaml (ถ้ามี)
+        - ช่วยให้โค้ดสะอาด เป็นระเบียบ เช่น:
+            - เตือนตัวแปรไม่ได้ใช้
+            - เตือน import ที่เกิน
+            - เตือน name convention
+    เหตุผลที่ใช้:
+        - ทำให้โปรเจกต์ดูเป็นมืออาชีพมากขึ้น
+        - อาจารย์มักชอบโปรเจกต์ที่เขียนโค้ดตามมาตรฐาน ไม่ใช่แค่ให้รันได้    
+
+        
+
+
+
